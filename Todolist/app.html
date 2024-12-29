@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        form {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            background-color: #218838;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #1e7e34;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background-color: #fff;
+        }
+
+        .delete {
+            color: red;
+            cursor: pointer;
+        }
+
+        .filters {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+
+        .filters button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #218838;
+            color: white;
+            cursor: pointer;
+        }
+
+        .filters button.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .count {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .completed {
+            text-decoration: line-through;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Todo App</h1>
+        <form id="todoForm">
+            <input type="text" id="todoInput" placeholder="Add a new task..." required>
+            <button type="submit">Add</button>
+        </form>
+        <ul id="todoList"></ul>
+        <div class="count" id="todoCount">Active Items: 0</div>
+        <div class="filters">
+            <button id="allFilter" class="active">All Items</button>
+            <button id="activeFilter">Active Items</button>
+            <button id="completedFilter">Completed Items</button>
+        </div>
+    </div>
+
+    <script>
+        const todoForm = document.getElementById('todoForm');
+        const todoInput = document.getElementById('todoInput');
+        const todoList = document.getElementById('todoList');
+        const todoCount = document.getElementById('todoCount');
+        const allFilter = document.getElementById('allFilter');
+        const activeFilter = document.getElementById('activeFilter');
+        const completedFilter = document.getElementById('completedFilter');
+        let active_tasks  = 0;
+        let todos = [];
+        let filter = 'all'; // Options: 'all', 'active', 'completed'
+
+        const API_URL = 'http://localhost:8000/todo';
+        async function fetchTodos() {
+            try {
+                const response = await fetch(API_URL);
+                const respData = await response.json();
+                todos = respData.responseData;
+                renderTodos();
+            } catch (error) {
+                console.error('Error fetching todos:', error);
+            }
+        }
+
+        function renderTodos() {
+            todoList.innerHTML = '';
+            const filteredTodos = todos.filter(todo => {
+                if (filter === 'active') return todo.status === 'active';
+                if (filter === 'completed') return todo.status === 'completed';
+                return true;
+            });
+
+            filteredTodos.forEach(todo => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <input type="checkbox" ${todo.status === 'completed' ? 'checked' : ''} class="toggle-status" data-id="${todo.task_id}">
+                    <span class="${todo.status === 'completed' ? 'completed' : ''}">${todo.task_name}</span>
+                    <span class="delete" data-id="${todo.task_id}">x</span>
+                `;
+                todoList.appendChild(li);
+            });
+            updateCount();
+        }
+
+        async function toggleStatus(id, status) {
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+
+                if (response.ok) {
+                    const updatedTodo = await response.json();
+                    todos.map(todo => {
+                            if(todo.task_id == id){
+                                todo.status = updatedTodo.responseData.status
+                            }
+                        });
+                    renderTodos();
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
+        }
+
+        function updateCount() {
+            if (filter === 'all') {
+                let allItems = todos.length
+                todoCount.textContent = `Active Items: ${allItems}`;
+            } else if (filter === 'active') {
+                let activeCount = todos.filter(todo => todo.status === 'active').length;
+                todoCount.textContent = `Active Items: ${activeCount}`;
+            } else {
+                let completedCount = todos.filter(todo => todo.status === 'completed').length;
+                todoCount.textContent = `Active Items   : ${completedCount}`;
+            }
+        }
+    
+        todoForm.addEventListener('submit', async (e) => {
+            // debugger;
+            e.preventDefault(); 
+            const task_name = todoInput.value.trim();
+            if (!task_name) return;
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_name, status: 'active' })
+                });
+                if (response.ok) {
+                        const newTodo = await response.json();
+                        todos.push(newTodo.responseData)
+                        renderTodos();
+                        }
+            } catch (error) {
+                console.error('Error adding todo:', error);
+            }
+            todoInput.value = ''; 
+        });
+
+        todoList.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('delete')) {
+            const id = e.target.getAttribute('data-id');
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const newTodo = await response.json();
+                
+                    todos = todos.filter(todo => todo.task_id != id);
+                    renderTodos();
+                }
+            } catch (error) {
+                console.error('Error deleting todo:', error);
+            }
+         }
+        if (e.target.classList.contains('toggle-status')) {
+                const id = e.target.getAttribute('data-id');
+                const status = e.target.checked ? 'completed' : 'active';
+                toggleStatus(id, status);
+        }
+        });
+
+        todoList.addEventListener('change', async (e) => {
+                if (e.target.classList.contains('toggle-completed')) {
+                    const id = e.target.getAttribute('data-id');
+                    const completed = e.target.checked;
+
+                    try {
+                        const response = await fetch(`${API_URL}/${id}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ completed })
+                        });
+
+                        if (response.ok) {
+                            const updatedTodo = await response.json();
+                            todos = todos.map(todo => (todo.id == id ? updatedTodo.responseData : todo));
+                            renderTodos();
+                        } else {
+                            console.error('Failed to update the todo');
+                        }
+                    } catch (error) {
+                        console.error('Error updating todo:', error);
+                    }
+                }
+        });
+
+        allFilter.addEventListener('click', () => {
+            filter = 'all';
+            setActiveFilter(allFilter);
+            renderTodos();
+        });
+
+        activeFilter.addEventListener('click', () => {
+            filter = 'active';
+            setActiveFilter(activeFilter);
+            renderTodos();
+        });
+
+        completedFilter.addEventListener('click', () => {
+            filter = 'completed';
+            setActiveFilter(completedFilter);
+            renderTodos();
+        });
+
+        function setActiveFilter(activeButton) {
+            [allFilter, activeFilter, completedFilter].forEach(button => button.classList.remove('active'));
+            activeButton.classList.add('active');
+        }
+        fetchTodos();
+    </script>
+</body>
+
+</html>
