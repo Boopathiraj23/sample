@@ -25,7 +25,7 @@ func CreateContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"responseData": TodoData, "message": "Content created successfully", "status": http.StatusOK})
 }
 
-// complete data
+// changecomplete data
 func CheckboxData(c *gin.Context) {
 	var TodoData model.Todo
 	if err = repository.Dbdata.First(&TodoData, "id = ?", c.Param("id")).Error; err != nil {
